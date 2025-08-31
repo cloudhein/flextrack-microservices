@@ -1,0 +1,71 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-deployment
+  labels:
+    app: redis
+  annotations:
+    reloader.stakater.com/auto: "true"  # Auto-restart when any secret/configmap changes
+    # OR use specific secret monitoring:
+    # secret.reloader.stakater.com/reload: "mongodb-secret"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis-container
+        image: redis:alpine
+        command: ["sh", "-c", "redis-server --requirepass $REDIS_PASSWORD"]
+        ports:
+        - containerPort: 6379
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: password
+        # Optional: Add liveness and readiness probes
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - --no-auth-warning
+            - -a
+            - $(REDIS_PASSWORD)
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - --no-auth-warning
+            - -a
+            - $(REDIS_PASSWORD)
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-database
+  labels:
+    app: redis
+spec:
+  selector:
+    app: redis  # must match the label in the Pod and immutable after creation
+  ports:
+  - targetPort: 6379
+    protocol: TCP
+    port: 6379
+  type: ClusterIP
