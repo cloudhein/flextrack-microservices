@@ -16,7 +16,7 @@ spec:
         app: expenses # must match the label in the Pod template and immutable after creation
     spec:
       containers:
-      - image: mrnanda/expenses:17366350459
+      - image: mrnanda/expenses:17366834013
         name: app-container
         ports:
         - containerPort: 8080
