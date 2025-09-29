@@ -89,6 +89,9 @@ spec:
           value: PLAINTEXT://kafka-node:9092
         - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
           value: "1"
+        # ADD THIS LINE TO FIX THE KAFKA CRASH
+        - name: _JAVA_OPTIONS
+          value: "-XX:-UseContainerSupport"
         ports:
         - containerPort: 9092
         - containerPort: 9093
