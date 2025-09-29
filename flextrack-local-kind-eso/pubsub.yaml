@@ -31,8 +31,8 @@ spec:
           value: "2181"
         - name: ZOOKEEPER_TICK_TIME
           value: "2000"
-          # ADD THIS LINE TO FIX THE CRASH
-        - name: ZOOKEEPER_OPTS
+        # CHANGED: Use _JAVA_OPTIONS instead of ZOOKEEPER_OPTS
+        - name: _JAVA_OPTIONS
           value: "-XX:-UseContainerSupport"
         ports:
         - containerPort: 2181
