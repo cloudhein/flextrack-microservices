@@ -16,7 +16,7 @@ spec:
         app: throttler
     spec:
       containers:
-      - image: mrnanda/throttler:19657239436
+      - image: mrnanda/throttler:19661411940
         name: app-container
         ports:
         - containerPort: 8080
