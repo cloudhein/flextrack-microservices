@@ -1,16 +1,3 @@
-apiVersion: v1
-kind: Secret
-metadata:
-  name: db-secret
-type: Opaque
-data:
-  host: cG9zdGdyZXMtZGF0YWJhc2U=
-  maxIdleConn: MzA=
-  maxOpenConn: MzA=
-  name: ZXhwZW5zZXM=
-  password: cGFzc3dvcmQ=
-  port: NTQzMg==
-  username: aGFycnk=
 ---
 apiVersion: batch/v1
 kind: Job
@@ -27,27 +14,27 @@ spec:
         - name: PGPASSWORD
           valueFrom:
             secretKeyRef:
-              name: db-secret
+              name: postgresdb-secret 
               key: password
         - name: DB_USERNAME
           valueFrom:
             secretKeyRef:
-              name: db-secret
+              name: postgresdb-secret 
               key: username
         - name: DB_HOST
           valueFrom:
             secretKeyRef:
-              name: db-secret
+              name: postgresdb-secret 
               key: host
         - name: DB_PORT
           valueFrom:
             secretKeyRef:
-              name: db-secret
+              name: postgresdb-secret 
               key: port
         - name: DB_NAME
           valueFrom:
             secretKeyRef:
-              name: db-secret
+              name: postgresdb-secret 
               key: name
         command:
         - /bin/sh
@@ -85,34 +72,76 @@ spec:
           echo "Migrations applied."
       restartPolicy: Never
 ---
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: StatefulSet
 metadata:
-  name: postgres-database
+  name: postgres-statefulset
+  labels:
+    app: postgres
+  annotations:
+    reloader.stakater.com/auto: "true"  # Auto-restart when any secret/configmap changes
+    # OR use specific secret monitoring:
+    # secret.reloader.stakater.com/reload: "mongodb-secret"
+spec:
+  serviceName: postgres-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres-container
+        image: postgres:14
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresdb-secret 
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresdb-secret 
+              key: password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgresdb-secret 
+              key: name
+        # - name: PGDATA
+        #   value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: standard # adjust based on your k8s setup
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
   labels:
     app: postgres
 spec:
-  containers:
-  - name: postgres-container
-    image: postgres:alpine
-    ports:
-    - containerPort: 5432
-    env:
-    - name: POSTGRES_USER
-      valueFrom:
-        secretKeyRef:
-          name: db-secret
-          key: username
-    - name: POSTGRES_PASSWORD
-      valueFrom:
-        secretKeyRef:
-          name: db-secret
-          key: password
-    - name: POSTGRES_DB
-      valueFrom:
-        secretKeyRef:
-          name: db-secret
-          key: name
+  ports:
+  - port: 5432
+    targetPort: 5432
+  clusterIP: None
+  selector:
+    app: postgres
 ---
 apiVersion: v1
 kind: Service
