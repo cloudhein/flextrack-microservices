@@ -16,7 +16,7 @@ spec:
         app: notifier
     spec:
       containers:
-      - image: mrnanda/notifier:19634383360
+      - image: mrnanda/notifier:19657384609
         name: app-container
         ports:
         - containerPort: 8080
