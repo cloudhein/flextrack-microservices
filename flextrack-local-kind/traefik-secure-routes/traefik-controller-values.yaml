@@ -1,0 +1,27 @@
+# -- Create a default IngressClass for Traefik
+ingressClass:  # @schema additionalProperties: false
+  enabled: true
+  isDefaultClass: true
+  name: ""
+
+ingressRoute:
+  dashboard:
+    # -- Create an IngressRoute for the dashboard
+    enabled: false
+
+websecure:
+    ## -- Enable this entrypoint as a default entrypoint. When a service doesn't explicitly set an entrypoint it will only use this entrypoint.
+    # asDefault: true
+    port: 8443
+    hostPort:  # @schema type:[integer, null]; minimum:0
+    containerPort:  # @schema type:[integer, null]; minimum:0
+    expose:
+      default: true
+    exposedPort: 443
+    tls:
+      enabled: true
+
+tlsStore:
+  default:
+    defaultCertificate:
+      secretName: traefik-secure-routes-secret  # Your TLS secret name

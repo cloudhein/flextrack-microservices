@@ -1,0 +1,83 @@
+---
+# 1. AUTH MIDDLEWARE
+# This replaces your "access_by_lua_block" script.
+# It sends the request to your throttler-app. 
+# If throttler returns 200, traffic flows. If it returns error, traffic stops.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: throttler-check
+  namespace: default
+spec:
+  forwardAuth:
+    # The internal DNS address of your rate limit service
+    address: "http://throttler-app.default.svc.cluster.local:8080/v1/ratelimit"
+    
+    # This ensures headers like "Authorization" are trusted and passed correctly
+    trustForwardHeader: true
+    
+    # By default, Traefik forwards all headers (including Authorization) 
+    # to the auth server, matching your Lua script's behavior.
+
+---
+# 2. STRIP PREFIX MIDDLEWARE (Expenses)
+# This replaces: nginx.ingress.kubernetes.io/rewrite-target: /$1 for expenses
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-expenses
+  namespace: default
+spec:
+  stripPrefix:
+    prefixes:
+      - "/expenses"
+
+---
+# 3. STRIP PREFIX MIDDLEWARE (Notifier)
+# This replaces: nginx.ingress.kubernetes.io/rewrite-target: /$1 for notifier
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-notifier
+  namespace: default
+spec:
+  stripPrefix:
+    prefixes:
+      - "/notifier"
+
+---
+# 4. THE ROUTER
+# This replaces your standard "kind: Ingress"
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: flextrack-route
+  namespace: default
+spec:
+  entryPoints:
+    - websecure # CHANGED: Now listening on the HTTPS port
+  
+  # ADDED: This enables TLS termination for this route.
+  # Without this line, Traefik will treat port 443 traffic as raw TCP/Plaintext and fail.
+  tls: {} 
+ 
+  routes:
+    # Route for Expenses App
+    - match: PathPrefix(`/expenses`)
+      kind: Rule
+      services:
+        - name: expenses-app
+          port: 8080
+      middlewares:
+        - name: throttler-check  # Run rate limit check first
+        - name: strip-expenses   # Then strip the path prefix
+
+    # Route for Notifier App
+    - match: PathPrefix(`/notifier`)
+      kind: Rule
+      services:
+        - name: notifier-app
+          port: 8080
+      middlewares:
+        - name: throttler-check  # Run rate limit check first
+        - name: strip-notifier   # Then strip the path prefix
