@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: traefik-alb-ingress
+  namespace: traefik
+  annotations:
+    # Create an internet-facing ALB
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    
+    # 'ip' mode routes traffic directly to Traefik Pod IPs (High Performance)
+    # This requires the Amazon VPC CNI plugin (standard on EKS)
+    alb.ingress.kubernetes.io/target-type: ip
+    
+    # Health check settings to ensure ALB knows Traefik is alive
+    alb.ingress.kubernetes.io/healthcheck-path: /ping
+    alb.ingress.kubernetes.io/healthcheck-port: "8000" # Matches Traefik's web port
+
+    # ✅ FIX: Accept 404 as a success code (404 means Traefik is running but didn't find a route)
+    alb.ingress.kubernetes.io/success-codes: "200,404"
+
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          # Route ALL traffic /* to the Traefik Service
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: traefik
+                port:
+                  number: 80

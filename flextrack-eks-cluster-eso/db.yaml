@@ -1,0 +1,158 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-setup-job
+spec:
+  ttlSecondsAfterFinished: 180
+  template:
+    spec:
+      containers:
+      - name: setup
+        image: alpine:latest
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresdb-secret 
+              key: password
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: postgresdb-secret 
+              key: username
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: postgresdb-secret 
+              key: host
+        - name: DB_PORT
+          valueFrom:
+            secretKeyRef:
+              name: postgresdb-secret 
+              key: port
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: postgresdb-secret 
+              key: name
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Installing necessary tools..."
+          apk add --no-cache git wget postgresql-client
+
+          echo "Installing go-migrate..."
+          wget https://github.com/golang-migrate/migrate/releases/download/v4.14.1/migrate.linux-amd64.tar.gz
+          tar -xzf migrate.linux-amd64.tar.gz
+          mv migrate.linux-amd64 /usr/local/bin/migrate
+
+          echo "Waiting for PostgreSQL to be ready..."
+          until psql -h $DB_HOST -U $DB_USERNAME -d $DB_NAME -c '\q'; do
+            sleep 2
+          done
+
+          echo "PostgreSQL is ready."
+
+          echo "Installing extensions..."
+          psql -h $DB_HOST -U $DB_USERNAME -d $DB_NAME <<EOF
+          CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+          CREATE EXTENSION IF NOT EXISTS "citext";
+          EOF
+
+          echo "Extensions installed."
+
+          echo "Cloning repository for migrations..."
+          git clone https://github.com/hasAnybodySeenHarry/expenses.git /migrations
+
+          echo "Running migrations..."
+          migrate -path /migrations/migrations -database "postgres://$DB_USERNAME:$PGPASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=disable" up
+
+          echo "Migrations applied."
+      restartPolicy: Never
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-statefulset
+  labels:
+    app: postgres
+  annotations:
+    reloader.stakater.com/auto: "true"  # Auto-restart when any secret/configmap changes
+    # OR use specific secret monitoring:
+    # secret.reloader.stakater.com/reload: "mongodb-secret"
+spec:
+  serviceName: postgres-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres-container
+        image: postgres:14
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresdb-secret 
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresdb-secret 
+              key: password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgresdb-secret 
+              key: name
+        # - name: PGDATA
+        #   value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+           # ✅ CRITICAL FIX: Mount into a subdirectory to ignore lost+found
+          subPath: pgdata
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: gp3 # adjust based on your k8s setup
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  labels:
+    app: postgres
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+  clusterIP: None
+  selector:
+    app: postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-database
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: postgres
