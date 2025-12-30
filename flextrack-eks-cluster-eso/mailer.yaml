@@ -16,7 +16,7 @@ spec:
         app: mailer
     spec:
       containers:
-      - image: mrnanda/mailer:20587587779
+      - image: mrnanda/mailer:20587746771
         name: app-container
         ports:
         - containerPort: 8080
