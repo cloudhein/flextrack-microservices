@@ -1,0 +1,47 @@
+# =============================================================================
+# HPA for Expenses App
+# =============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: expenses-app-hpa
+  labels:
+    app: expenses
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: expenses-app
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # ✅ Added explicit behavior to prevent flapping (scale down jitter)
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleUp:
+      stabilizationWindowSeconds: 0 # React immediately (don't wait)
+      policies:
+      - type: Percent
+        value: 100              # Option A: Double the count (add 100%)
+        periodSeconds: 15
+      - type: Pods
+        value: 4                # Option B: Add exactly 4 pods
+        periodSeconds: 15
+      selectPolicy: Max         # Decision: Pick the higher number between A and B
