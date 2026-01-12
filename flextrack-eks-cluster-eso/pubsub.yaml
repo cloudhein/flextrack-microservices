@@ -80,6 +80,16 @@ spec:
       containers:
       - name: kafka
         image: confluentinc/cp-kafka:7.3.0 # bitnami/kafka:3.3 (are no longer free and need a license)
+
+         # ✅ ADDED: Kafka Resources (Java app needs heap)
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+            
         env:
         - name: KAFKA_BROKER_ID
           value: "1"

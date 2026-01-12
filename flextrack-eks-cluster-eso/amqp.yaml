@@ -46,6 +46,17 @@ spec:
             secretKeyRef:
               name: amqp-secret
               key: password
+
+        # ✅ ADDED: Resource Requests & Limits
+        # RabbitMQ can be CPU hungry during message spikes.
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "150m"   # 0.15 vCPU
+          limits:
+            memory: "512Mi"
+            cpu: "500m"   # 0.5 vCPU
+
         livenessProbe:
           exec:
             command:

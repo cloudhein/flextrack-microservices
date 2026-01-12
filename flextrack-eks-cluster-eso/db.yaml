@@ -98,6 +98,17 @@ spec:
         image: postgres:14
         ports:
         - containerPort: 5432
+        
+        # ✅ ADDED: Database Resources
+        # Postgres needs guaranteed RAM to be stable.
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
         env:
         - name: POSTGRES_USER
           valueFrom:

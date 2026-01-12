@@ -20,7 +20,16 @@ spec:
         name: app-container
         ports:
         - containerPort: 8080
-        resources: {}
+        
+          # ✅ ADDED: Notifier Resources
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+            
         readinessProbe:
           httpGet:
             path: /v1/healthcheck
